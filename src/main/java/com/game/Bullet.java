@@ -13,7 +13,7 @@ public class Bullet extends Entity {
     public int ownerId;
     public boolean active = true;
     public float baseKnock = 18f;
-    public float impactShieldDamage = 28f;
+    public float impactShieldDamage = 10f;
 
     public Bullet(Vector2 spawn, Vector2 dir, int ownerId) {
         this.pos = spawn.cpy();

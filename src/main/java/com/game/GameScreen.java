@@ -109,8 +109,12 @@ public class GameScreen extends ScreenAdapter {
                     boolean blocked = p.tryBlock(b);
                     double kbGain = 8.0;
                     if (blocked) kbGain *= 0.5;
+                    double kbBefore = p.knockback;
                     p.knockback += kbGain;
                     if (p.knockback > 100) p.knockback = 100;
+
+                    Gdx.app.log("KB", String.format("P%d nhận KB: +%.1f (%.1f -> %.1f) [Blocked: %s]",
+                            p.id, kbGain, kbBefore, p.knockback, blocked ? "Yes" : "No"));
 
                     p.applyImpulse(b.dir.scl((float)(kbGain * 0.09)));
 

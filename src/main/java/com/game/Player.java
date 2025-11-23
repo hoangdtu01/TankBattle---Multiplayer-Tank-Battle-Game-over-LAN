@@ -22,6 +22,7 @@ public class Player extends Entity {
     public float maxShield = 100f;
     public float shieldDurability = maxShield;
     public float shieldBrokenTimer = 0f;
+    public float shieldRegenRate = 10f; // Tốc độ hồi shield mỗi giây
 
     public int clipSize = 6;
     public int clip = clipSize;
@@ -31,13 +32,14 @@ public class Player extends Entity {
 
     public float knockback = 0f;
     public float knockbackDecay = 6f;
+    public float knockbackImmunityTimer = 0f; // Thời gian miễn giới hạn maxSpeed sau khi nhận knockback mạnh
 
     public boolean alive = true;
     public float deathTimer = 0f;
 
     public boolean isDashing = false;
     public float dashSpeed = 520f;
-    public float dashTime = 0.18f;
+    public float dashTime = 0.3f;
     public float dashTimer = 0f;
     public int ramTickCounter = 0;
     public int lastRamTick = -1;
@@ -65,8 +67,14 @@ public class Player extends Entity {
 
         if (shieldBrokenTimer > 0f) {
             shieldBrokenTimer -= dt;
-            if (shieldBrokenTimer <= 0f && shieldDurability <= 0f)
-                shieldDurability = Math.min(10f, maxShield * 0.2f);
+        }
+        
+        // Hồi shield dần dần sau khi bị vỡ
+        if (shieldBrokenTimer <= 0f && shieldDurability < maxShield && !isShielding) {
+            shieldDurability += shieldRegenRate * dt;
+            if (shieldDurability > maxShield) {
+                shieldDurability = maxShield;
+            }
         }
 
         if (isReloading) {
@@ -82,7 +90,9 @@ public class Player extends Entity {
 
         if (!isReloading && wantShoot) shoot();
 
+        // Chỉ cho phép dùng shield khi shield đã đầy
         isShielding = wantShield && shieldDurability > 0f && shieldBrokenTimer <= 0f;
+        
 
         if (wantSkill && !isDashing && !isReloading) {
             isDashing = true;
@@ -106,10 +116,29 @@ public class Player extends Entity {
                 vel.add(acc);
             }
 
-            vel.scl(1f / (1f + friction * dt));
+            // Giảm friction khi đang bị knockback cao
+            float currentFriction = friction;
+            if (knockback > 90) {
+                currentFriction = friction * 0.3f; // Giảm friction khi KB cao
+            }
 
-            if (vel.len() > maxSpeed)
-                vel.nor().scl(maxSpeed);
+            vel.scl(1f / (1f + currentFriction * dt));
+
+            // Cho phép vượt maxSpeed khi vừa nhận knockback mạnh hoặc KB cao
+            float effectiveMaxSpeed = maxSpeed;
+            if (knockbackImmunityTimer > 0f) {
+                effectiveMaxSpeed = Float.MAX_VALUE; // Không giới hạn
+                knockbackImmunityTimer -= dt;
+            } else if (knockback >= 100f) {
+                effectiveMaxSpeed = maxSpeed * 2f; // Tăng gấp 5 lần khi KB = 100
+            } else if (knockback > 70f) {
+                effectiveMaxSpeed = maxSpeed * 1.5f; // Tăng gấp 3 lần khi KB > 70
+            } else if (knockback > 40f) {
+                effectiveMaxSpeed = maxSpeed * 1f; // Tăng gấp 2 lần khi KB > 40
+            }
+
+            if (vel.len() > effectiveMaxSpeed)
+                vel.nor().scl(effectiveMaxSpeed);
 
             pos.add(vel.cpy().scl(dt));
         }
@@ -120,30 +149,30 @@ public class Player extends Entity {
 
     public void applyImpulse(Vector2 impulse) {
         vel.add(impulse);
+        // Nếu impulse đủ mạnh, cho phép vượt maxSpeed trong thời gian ngắn
+        // CHỈ áp dụng cho target (người nhận knockback), KHÔNG áp dụng cho attacker (phản lực)
+        float impulseLen = impulse.len();
+        if (impulseLen > 500f && !isDashing) { // Chỉ khi không phải đang dash (tránh phản lực từ dash)
+            knockbackImmunityTimer = 0.3f; // 0.3 giây miễn giới hạn maxSpeed
+        }
     }
 
     public boolean tryBlock(Bullet b) {
         if (!isShielding) return false;
-        Vector2 incoming = b.dir.cpy().scl(-1f);
-        float angleDiff = Math.abs(shortestAngle(facing, incoming.angleRad()));
-        float arc = (float)Math.toRadians(110);
-        if (angleDiff <= arc/2f) {
-            shieldDurability -= b.impactShieldDamage;
-            if (shieldDurability <= 0f) {
-                shieldDurability = 0f;
-                isShielding = false;
-                shieldBrokenTimer = 1.5f;
-            }
-            return true;
+        // Shield bây giờ là vòng tròn, block mọi hướng
+        float shieldBefore = shieldDurability;
+        shieldDurability -= b.impactShieldDamage;
+        if (shieldDurability <= 0f) {
+            shieldDurability = 0f;
+            isShielding = false;
+            shieldBrokenTimer = 1.5f;
+            Gdx.app.log("SHIELD", String.format("P%d shield bị vỡ! Nhận damage: %.1f (%.1f -> 0.0)",
+                    id, b.impactShieldDamage, shieldBefore));
+        } else {
+            Gdx.app.log("SHIELD", String.format("P%d shield nhận damage: %.1f (%.1f -> %.1f)",
+                    id, b.impactShieldDamage, shieldBefore, shieldDurability));
         }
-        return false;
-    }
-
-    private float shortestAngle(float a, float b) {
-        float diff = a - b;
-        while (diff < -Math.PI) diff += Math.PI*2;
-        while (diff > Math.PI) diff -= Math.PI*2;
-        return diff;
+        return true;
     }
 
     private float shootCooldown = 0.12f;
@@ -177,10 +206,9 @@ public class Player extends Entity {
         sr.setColor(Color.WHITE);
         sr.rectLine(pos.x,pos.y,pos.x+d.x*(radius+16),pos.y+d.y*(radius+16),2f);
 
-        if (isShielding || shieldDurability < maxShield) {
-            sr.setColor(new Color(0,0.6f,1f,0.15f));
-            float angleDeg = -facing * 57.2958f;
-            sr.arc(pos.x,pos.y,radius+24f,angleDeg-55f,110f);
+        if (isShielding) {
+            sr.setColor(new Color(0f, 0.6f, 1f, 0.20f)); // opaque hơn khi người chơi chủ động bật
+            sr.circle(pos.x, pos.y, radius + 24f);
         }
 
         sr.setColor(Color.DARK_GRAY);
