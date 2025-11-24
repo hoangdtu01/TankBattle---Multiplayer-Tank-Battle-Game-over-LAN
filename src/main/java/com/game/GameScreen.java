@@ -5,6 +5,8 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 
@@ -18,6 +20,12 @@ public class GameScreen extends ScreenAdapter {
 
     private OrthographicCamera cam;
     private ShapeRenderer sr;
+    private SpriteBatch batch;
+
+    private Texture arenaTexture;
+    private Texture player1Texture;
+    private Texture player2Texture;
+    private Texture bulletTexture;
 
     private Arena arena;
     private List<Player> players = new ArrayList<>();
@@ -32,6 +40,7 @@ public class GameScreen extends ScreenAdapter {
         cam = new OrthographicCamera();
         cam.setToOrtho(false, WORLD_W, WORLD_H);
         sr = new ShapeRenderer();
+        batch = new SpriteBatch();
 
         arena = new Arena(new Vector2(WORLD_W/2f, WORLD_H/2f), 320f);
 
@@ -45,7 +54,26 @@ public class GameScreen extends ScreenAdapter {
 
         for (Player p: players) p.setBulletList(bullets);
 
+        loadTextures();
+        arena.setTexture(arenaTexture);
+        p1.setTexture(player1Texture);
+        p2.setTexture(player2Texture);
+        Bullet.setSharedTexture(bulletTexture);
+
         Gdx.app.log("Info", "Ref sketch: /mnt/data/62654caa-0b68-407d-8595-193c0a8c8bfc.png");
+    }
+
+    private void loadTextures() {
+        arenaTexture = loadTexture("asset/arena.png");
+        player1Texture = loadTexture("asset/player1.png");
+        player2Texture = loadTexture("asset/player2.png");
+        bulletTexture = loadTexture("asset/bullet.png");
+    }
+
+    private Texture loadTexture(String path) {
+        Texture texture = new Texture(Gdx.files.internal(path));
+        texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        return texture;
     }
 
     @Override
@@ -61,13 +89,15 @@ public class GameScreen extends ScreenAdapter {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
         cam.update();
         sr.setProjectionMatrix(cam.combined);
+        batch.setProjectionMatrix(cam.combined);
+
+        batch.begin();
+        arena.renderSprite(batch);
+        for (Bullet b : bullets) b.renderSprite(batch);
+        for (Player p : players) p.renderSprite(batch);
+        batch.end();
 
         sr.begin(ShapeRenderer.ShapeType.Filled);
-        arena.renderFilled(sr);
-        sr.end();
-
-        sr.begin(ShapeRenderer.ShapeType.Filled);
-        for (Bullet b : bullets) b.render(sr);
         for (Player p : players) p.render(sr);
         sr.end();
 
@@ -146,5 +176,15 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
-}
 
+    @Override
+    public void dispose() {
+        super.dispose();
+        if (sr != null) sr.dispose();
+        if (batch != null) batch.dispose();
+        if (arenaTexture != null) arenaTexture.dispose();
+        if (player1Texture != null) player1Texture.dispose();
+        if (player2Texture != null) player2Texture.dispose();
+        if (bulletTexture != null) bulletTexture.dispose();
+    }
+}

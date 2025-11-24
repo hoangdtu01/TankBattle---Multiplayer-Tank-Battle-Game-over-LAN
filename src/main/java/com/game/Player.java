@@ -2,7 +2,10 @@ package com.game;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 
 import java.util.List;
@@ -12,6 +15,7 @@ public class Player extends Entity {
     public int id;
     public float facing = 0f;
     public float radius = 18f;
+    public float spriteScale = 1.6f;
     public Color color = Color.CYAN;
 
     public float maxSpeed = 220f;
@@ -51,6 +55,7 @@ public class Player extends Entity {
     public boolean wantSkill = false;
 
     private List<Bullet> bullets;
+    private Texture texture;
 
     public Player(int id, Vector2 spawn) {
         this.id = id;
@@ -61,6 +66,10 @@ public class Player extends Entity {
 
     public void setBulletList(List<Bullet> bullets) {
         this.bullets = bullets;
+    }
+
+    public void setTexture(Texture texture) {
+        this.texture = texture;
     }
 
     public void update(float dt) {
@@ -175,7 +184,7 @@ public class Player extends Entity {
         return true;
     }
 
-    private float shootCooldown = 0.12f;
+    private float shootCooldown = 0.06f;
     private float shootTimer = 0f;
 
     public void shoot() {
@@ -198,13 +207,40 @@ public class Player extends Entity {
         clip--;
     }
 
-    public void render(ShapeRenderer sr) {
-        sr.setColor(alive ? color : Color.GRAY);
-        sr.circle(pos.x, pos.y, radius);
+    public void renderSprite(SpriteBatch batch) {
+    if (texture == null) return;
+    float diameter = radius * 2f * spriteScale;
+    float origin = radius * spriteScale;
+    float rotation = facing * MathUtils.radiansToDegrees;
+    batch.setColor(alive ? Color.WHITE : Color.GRAY);
+    batch.draw(texture,
+            pos.x - origin,
+            pos.y - origin,
+            origin,
+            origin,
+            diameter,
+            diameter,
+            1f,
+            1f,
+            rotation,
+            0,
+            0,
+            texture.getWidth(),
+            texture.getHeight(),
+            false,
+            false);
+    batch.setColor(Color.WHITE);
+}
 
-        Vector2 d = new Vector2((float)Math.cos(facing),(float)Math.sin(facing));
-        sr.setColor(Color.WHITE);
-        sr.rectLine(pos.x,pos.y,pos.x+d.x*(radius+16),pos.y+d.y*(radius+16),2f);
+    public void render(ShapeRenderer sr) {
+        if (texture == null) {
+            sr.setColor(alive ? color : Color.GRAY);
+            sr.circle(pos.x, pos.y, radius);
+
+            Vector2 d = new Vector2((float)Math.cos(facing),(float)Math.sin(facing));
+            sr.setColor(Color.WHITE);
+            sr.rectLine(pos.x,pos.y,pos.x+d.x*(radius+16),pos.y+d.y*(radius+16),2f);
+        }
 
         if (isShielding) {
             sr.setColor(new Color(0f, 0.6f, 1f, 0.20f)); // opaque hơn khi người chơi chủ động bật
@@ -239,4 +275,3 @@ public class Player extends Entity {
         isDashing = false;
     }
 }
-

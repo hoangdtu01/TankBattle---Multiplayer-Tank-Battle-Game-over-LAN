@@ -22,13 +22,13 @@ public class KnockbackSystem {
         if (KB >= 100f) {
             finalForce *= 1.15; // Tăng gấp 3 lần khi KB = 100 (đảm bảo văng ra map)
         } else if (KB >= 80f) {
-            finalForce *= 1.15; // Tăng gấp 2 lần khi KB >= 80
+            finalForce *= 1.2; // Tăng gấp 2 lần khi KB >= 80
         } else if (KB >= 60f) {
-            finalForce *= 1.11; // Tăng 50% khi KB >= 60
+            finalForce *= 1.16; // Tăng 50% khi KB >= 60
         } else if (KB >= 40f) {
-            finalForce *= 1.07; // Tăng 50% khi KB >= 60
+            finalForce *= 1.12; // Tăng 50% khi KB >= 60
         } else if (KB >= 20f) {
-            finalForce *= 1.04; // Tăng 50% khi KB >= 60
+            finalForce *= 1.08; // Tăng 50% khi KB >= 60
         } else if (KB >= 10f) {
             finalForce *= 1; // Tăng 50% khi KB >= 60
         } 
