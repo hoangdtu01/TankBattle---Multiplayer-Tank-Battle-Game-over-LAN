@@ -3,9 +3,11 @@ package com.game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.ScreenAdapter;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
@@ -36,11 +38,16 @@ public class GameScreen extends ScreenAdapter {
 
     private float accumulator = 0f;
 
+    // Hoang
+    private BitmapFont font;
+
     public GameScreen() {
         cam = new OrthographicCamera();
         cam.setToOrtho(false, WORLD_W, WORLD_H);
         sr = new ShapeRenderer();
         batch = new SpriteBatch();
+        // Hoang
+        font = new BitmapFont();
 
         arena = new Arena(new Vector2(WORLD_W/2f, WORLD_H/2f), 320f);
 
@@ -104,6 +111,17 @@ public class GameScreen extends ScreenAdapter {
         sr.begin(ShapeRenderer.ShapeType.Line);
         arena.renderOutline(sr);
         sr.end();
+
+        //Hoang - hiển thị 3 thanh đạn, % , khiên
+        sr.begin(ShapeRenderer.ShapeType.Filled);
+        drawHUD(sr);
+        sr.end();
+
+        batch.begin();
+        drawHUDText();
+        batch.end();
+
+
 
         if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
             for (Player p : players)
@@ -176,6 +194,107 @@ public class GameScreen extends ScreenAdapter {
             }
         }
     }
+
+    private void drawHUD(ShapeRenderer sr) {
+
+        float barWidth = 160;
+        float barHeight = 12;
+        float padding = 20;
+
+        for (int i = 0; i < players.size(); i++) {
+            Player p = players.get(i);
+
+            float x = 0, y = 0;
+
+            switch(i) {
+                case 0: // Player 1 - top left
+                    x = padding;
+                    y = WORLD_H - padding - 60;
+                    break;
+                case 1: // Player 2 - top right
+                    x = WORLD_W - padding - barWidth;
+                    y = WORLD_H - padding - 60;
+                    break;
+                case 2: // Player 3 - bottom left
+                    x = padding;
+                    y = padding + 60;
+                    break;
+                case 3: // Player 4 - bottom right
+                    x = WORLD_W - padding - barWidth;
+                    y = padding + 60;
+                    break;
+            }
+
+            drawPlayerHUD(sr, p, x, y, barWidth, barHeight);
+        }
+    }
+
+    private void drawPlayerHUD(ShapeRenderer sr, Player p,
+                            float x, float y,
+                            float barWidth, float barHeight) {
+
+        // --- SHIELD BAR ---
+        sr.setColor(Color.DARK_GRAY);
+        sr.rect(x, y, barWidth, barHeight);
+
+        sr.setColor(Color.CYAN);
+        float shieldRatio = p.shieldDurability / p.maxShield;
+        sr.rect(x, y, barWidth * shieldRatio, barHeight);
+
+
+        // --- AMMO BAR ---
+        float ammoY = y - 18;
+        sr.setColor(Color.DARK_GRAY);
+        sr.rect(x, ammoY, barWidth, barHeight);
+
+        sr.setColor(Color.YELLOW);
+        float ammoRatio = (float)p.clip / p.clipSize;
+        sr.rect(x, ammoY, barWidth * ammoRatio, barHeight);
+
+
+        // --- KNOCKBACK BAR ---
+        float kbY = y + 18;
+        sr.setColor(Color.DARK_GRAY);
+        sr.rect(x, kbY, barWidth, barHeight);
+
+        // màu KB chuyển từ xanh → vàng → đỏ khi càng cao
+        Color kbColor = new Color(
+                Math.min(1f, p.knockback / 100f),
+                Math.max(0f, 1f - p.knockback / 50f),
+                0f,
+                1f
+        );
+
+        sr.setColor(kbColor);
+        float kbRatio = p.knockback / 100f;
+        sr.rect(x, kbY, barWidth * kbRatio, barHeight);
+    }
+
+    private void drawHUDText() {
+        font.setColor(Color.WHITE);
+
+        float padding = 20;
+
+        for (int i = 0; i < players.size(); i++) {
+            Player p = players.get(i);
+
+            float x = 0, y = 0;
+
+            switch(i) {
+                case 0: x = padding; y = WORLD_H - padding - 20; break;
+                case 1: x = WORLD_W - padding - 160; y = WORLD_H - padding - 20; break;
+                case 2: x = padding; y = padding + 120; break;
+                case 3: x = WORLD_W - padding - 160; y = padding + 120; break;
+            }
+
+            font.draw(batch,
+                    "KB: " + (int)p.knockback + "%",
+                    x, y
+            );
+        }
+    }
+
+
 
     @Override
     public void dispose() {
