@@ -9,6 +9,6 @@ public class Main {
         config.setTitle("Ring Duel - LibGDX");
         config.setWindowedMode(1280, 768);
         config.useVsync(true);
-        new Lwjgl3Application(new RingDuelGame(), config);
+        new Lwjgl3Application(new RingDuelGame(), config); 
     }
 }

@@ -1,0 +1,157 @@
+package com.game.ui.screens;
+
+import java.util.Map;
+
+import com.badlogic.gdx.*;
+import com.badlogic.gdx.graphics.GL20;
+import com.badlogic.gdx.scenes.scene2d.*;
+import com.badlogic.gdx.scenes.scene2d.ui.*;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import com.game.RingDuelGame;
+import com.game.net.client.NetClient;
+import com.game.net.protocol.Messages.RoomUpdate;
+import com.game.net.protocol.Messages.PeerList;
+import com.game.net.protocol.Messages.GameConfigMsg;
+import com.game.net.protocol.MessageTypes;
+import com.game.net.protocol.Messages.Ready;
+import com.game.net.protocol.Messages.RequestRoomState;
+import com.game.net.protocol.Messages.RoomList;
+import com.game.gameplay.GameScreen;
+
+public class RoomScreen implements Screen {
+
+    private RingDuelGame game;
+    private Stage stage;
+    private Skin skin;
+    private boolean ready = false;
+
+    public RoomScreen(RingDuelGame game) {
+        this.game = game;
+    }
+
+    @Override
+    public void show() {
+        stage = new Stage(new ScreenViewport());
+        Gdx.input.setInputProcessor(stage);
+        skin = new Skin(Gdx.files.internal("asset/uiskin.json"));
+
+        Table root = new Table();
+        root.setFillParent(true);
+        root.pad(20);
+        stage.addActor(root);
+
+        // ===== ROOM TITLE =====
+        Label roomTitle = new Label("ROOM: " + game.roomId, skin);
+        roomTitle.setFontScale(1.4f);
+        root.add(roomTitle).padBottom(20).row();
+
+        // ===== PLAYER LIST =====
+        Table playerTable = new Table();
+        root.add(playerTable).padBottom(20).row();
+
+        Label status = new Label("Waiting...", skin);
+        root.add(status).padBottom(10).row();
+
+        TextButton readyBtn = new TextButton("READY", skin);
+        root.add(readyBtn).width(200).height(45);
+
+        readyBtn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                ready = !ready;
+                status.setText(ready ? "READY" : "Waiting...");
+                readyBtn.setText(ready ? "UNREADY" : "READY");
+
+                try {
+                    Ready msg = new Ready();
+                    msg.type = MessageTypes.READY;
+                    msg.roomId = game.roomId;
+                    msg.ready = ready;
+
+                    game.netClient.send(msg);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        game.netClient.setListener(new NetClient.Listener() {
+
+            @Override
+            public void onWelcome(int playerId) {
+                game.playerId = playerId;
+                System.out.println("[GAME] My playerId = " + playerId);
+            }
+
+            @Override
+            public void onRoomUpdate(RoomUpdate ru) {
+                System.out.println(
+                    "ROOM_UPDATE:  " + ru.roomId + " : " + ru.players.values()
+                );
+
+                if (!ru.roomId.equals(game.roomId)) return;
+
+                Gdx.app.postRunnable(() -> {
+                    playerTable.clearChildren();
+
+                    for (Map.Entry<Integer, String> e : ru.players.entrySet()) {
+                        String name = e.getValue();
+                        boolean isReady = ru.ready.getOrDefault(e.getKey(), false);
+
+                        Label pLabel = new Label(
+                            name + (isReady ? "  Ready" : ""),
+                            skin
+                        );
+                        playerTable.add(pLabel).left().pad(4).row();
+                    }
+                });
+            }
+
+
+            @Override
+            public void onRoomList(RoomList rl) {
+                // KHÔNG DÙNG Ở ROOM SCREEN  (để trống)
+            }
+
+            @Override
+            public void onPeerList(PeerList pl) {
+                // Sẽ dùng ở bước UDP handshake (để trống tạm)
+            }
+
+            @Override
+            public void onGameConfig(GameConfigMsg gc) {
+                Gdx.app.postRunnable(() -> {
+
+                    if (game.playerId <= 0) {
+                        System.err.println(" GameConfig đến trước WELCOME đợi playerId");
+                        return;
+                    }
+                    game.setScreen(new GameScreen(game, gc));
+                });
+            }
+        });
+
+        try {
+            RequestRoomState req = new RequestRoomState();
+            req.type = MessageTypes.REQUEST_ROOM_STATE;
+            req.roomId = game.roomId;
+            game.netClient.send(req);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void render(float delta) {
+        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
+        stage.act(delta);
+        stage.draw();
+    }
+
+    @Override public void resize(int w, int h) { stage.getViewport().update(w, h, true); }
+    @Override public void dispose() { stage.dispose(); skin.dispose(); }
+    @Override public void hide() {}
+    @Override public void pause() {}
+    @Override public void resume() {}
+}
