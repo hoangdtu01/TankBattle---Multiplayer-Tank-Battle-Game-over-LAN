@@ -19,6 +19,7 @@ public class NetClient {
         void onPeerList(PeerList pl);
         void onGameConfig(GameConfigMsg gc);
         void onRoomList(RoomList rl);
+        void onRoomClosed(RoomClosed rc);
     }
 
     private Listener listener;
@@ -83,6 +84,10 @@ public class NetClient {
                     case GAME_CONFIG -> {
                         System.out.println("[TCP] Received GameConfig");
                         listener.onGameConfig((GameConfigMsg) msg);
+                    }
+                    case ROOM_CLOSED -> {
+                        System.out.println("[TCP] Received RoomClosed");
+                        listener.onRoomClosed((RoomClosed) msg);
                     }
                 }
             }

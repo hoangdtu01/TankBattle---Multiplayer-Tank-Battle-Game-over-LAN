@@ -66,6 +66,14 @@ public class Messages {
         public String roomId;
     }
     
+    public static class LeaveRoom extends BaseMessage {
+        public String roomId;
+    }
+    
+    public static class RoomClosed extends BaseMessage {
+        public String roomId;
+    }
+    
     // ===== GAMEPLAY UDP =====
     public static class InputMsg implements Serializable {
         public int playerId;

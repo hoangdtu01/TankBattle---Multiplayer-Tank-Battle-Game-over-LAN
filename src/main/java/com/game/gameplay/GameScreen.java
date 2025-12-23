@@ -12,8 +12,20 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.scenes.scene2d.Actor;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.viewport.FitViewport;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import com.game.RingDuelGame;
+import com.game.ui.screens.MainMenuScreen;
+import com.game.ui.screens.SettingsScreen;
+import com.game.net.protocol.Messages.LeaveRoom;
+import com.game.net.protocol.Messages.RoomClosed;
+import com.game.net.protocol.MessageTypes;
 import com.game.core.Arena;
 import com.game.core.Bullet;
 import com.game.core.KnockbackSystem;
@@ -41,6 +53,7 @@ public class GameScreen extends ScreenAdapter {
     private FitViewport viewport;
     private HUDRenderer hud;
 
+    private Texture worldTexture;
     private Texture arenaTexture;
     private Texture player1Texture;
     private Texture player2Texture;
@@ -74,6 +87,13 @@ public class GameScreen extends ScreenAdapter {
     // Hoang Client đỡ lag bằng Prediction + replay
     private int inputSeq = 0;
     private List<InputMsg> pendingInputs = new ArrayList<>();
+    
+    // Menu UI
+    private RingDuelGame game;
+    private Stage menuStage;
+    private Skin menuSkin;
+    private boolean menuOpen = false;
+    private Table menuTable;
 
 
     public GameScreen() {
@@ -120,6 +140,8 @@ public class GameScreen extends ScreenAdapter {
     // ===== MULTIPLAYER CONSTRUCTOR =====
     public GameScreen(RingDuelGame game, GameConfigMsg gc) {
         this(); // gọi constructor cũ để init toàn bộ gameplay
+        this.game = game;
+        setupMenu();
 
         players.clear();
 
@@ -136,6 +158,14 @@ public class GameScreen extends ScreenAdapter {
             Player p = new Player(pid, spawn);
             p.setBulletList(bullets);
             p.allowAuthoritativeActions = (pid == gc.hostPlayerId);
+            
+            // Gán texture cho player dựa trên ID (luân phiên giữa player1 và player2)
+            if (pid % 2 == 1) {
+                p.setTexture(player1Texture);
+            } else {
+                p.setTexture(player2Texture);
+            }
+            
             players.add(p);
 
             angle += angleStep;
@@ -202,6 +232,7 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void loadTextures() {
+        worldTexture = loadTexture("asset/world.png");
         arenaTexture = loadTexture("asset/arena.png");
         player1Texture = loadTexture("asset/player1.png");
         player2Texture = loadTexture("asset/player2.png");
@@ -212,6 +243,92 @@ public class GameScreen extends ScreenAdapter {
         Texture texture = new Texture(Gdx.files.internal(path));
         texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
         return texture;
+    }
+    
+    private void setupMenu() {
+        menuStage = new Stage(new ScreenViewport());
+        menuSkin = new Skin(Gdx.files.internal("asset/uiskin.json"));
+        
+        // Menu button ở góc trên bên phải
+        TextButton menuBtn = new TextButton("MENU", menuSkin);
+        menuBtn.setPosition(WORLD_W - 120, 20);
+        menuBtn.getColor().a = 0.8f;
+        menuBtn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                toggleMenu();
+            }
+        });
+        menuStage.addActor(menuBtn);
+        
+        // Menu popup table
+        menuTable = new Table();
+        menuTable.setFillParent(true);
+        menuTable.setVisible(false);
+        // Tạo background đơn giản từ white color với alpha
+        menuTable.setBackground(menuSkin.newDrawable("white", new Color(0, 0, 0, 0.8f)));
+        
+        TextButton mainMenuBtn = new TextButton("BACK TO MAIN MENU", menuSkin);
+        mainMenuBtn.getColor().a = 0.9f;
+        mainMenuBtn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if (game != null) {
+                    // Nếu là host, gửi LEAVE_ROOM để đóng room
+                    if (isHost) {
+                        try {
+                            LeaveRoom lr = new LeaveRoom();
+                            lr.type = MessageTypes.LEAVE_ROOM;
+                            lr.roomId = game.roomId;
+                            // Gửi qua TCP connection
+                            if (game.netClient != null && game.netClient.isConnected()) {
+                                game.netClient.send(lr);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    game.setScreen(new MainMenuScreen(game));
+                }
+            }
+        });
+        
+        TextButton settingsBtn = new TextButton("SETTINGS", menuSkin);
+        settingsBtn.getColor().a = 0.9f;
+        settingsBtn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if (game != null) {
+                    toggleMenu();
+                    game.setScreen(new SettingsScreen(game, GameScreen.this));
+                }
+            }
+        });
+        
+        TextButton closeBtn = new TextButton("CLOSE", menuSkin);
+        closeBtn.getColor().a = 0.9f;
+        closeBtn.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                toggleMenu();
+            }
+        });
+        
+        menuTable.add(mainMenuBtn).width(300).height(50).padBottom(15).row();
+        menuTable.add(settingsBtn).width(300).height(50).padBottom(15).row();
+        menuTable.add(closeBtn).width(300).height(50);
+        
+        menuStage.addActor(menuTable);
+    }
+    
+    private void toggleMenu() {
+        menuOpen = !menuOpen;
+        menuTable.setVisible(menuOpen);
+        if (menuOpen) {
+            Gdx.input.setInputProcessor(menuStage);
+        } else {
+            Gdx.input.setInputProcessor(null);
+        }
     }
 
     @Override
@@ -232,6 +349,10 @@ public class GameScreen extends ScreenAdapter {
         batch.setProjectionMatrix(cam.combined);
 
         batch.begin();
+        // Render background world
+        if (worldTexture != null) {
+            batch.draw(worldTexture, 0, 0, WORLD_W, WORLD_H);
+        }
         arena.renderSprite(batch);
         for (Bullet b : bullets) b.renderSprite(batch);
         for (Player p : players) p.renderSprite(batch);
@@ -242,15 +363,29 @@ public class GameScreen extends ScreenAdapter {
         sr.end();
 
         sr.begin(ShapeRenderer.ShapeType.Line);
-        arena.renderOutline(sr);
+        // arena.renderOutline(sr);
         sr.end();
 
         if (Gdx.input.isKeyPressed(Input.Keys.F1)) {
             for (Player p : players)
                 Gdx.app.log("DBG", p.toDebugString());
         }
+        
+        // Handle ESC key to toggle menu
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            if (game != null) {
+                toggleMenu();
+            }
+        }
+        
         // Hoang Hud
         hud.render(players);
+        
+        // Render menu UI
+        if (menuStage != null) {
+            menuStage.act(delta);
+            menuStage.draw();
+        }
 
     }
 
@@ -469,6 +604,9 @@ public class GameScreen extends ScreenAdapter {
     @Override
     public void resize(int width, int height) {
         viewport.update(width, height, true);
+        if (menuStage != null) {
+            menuStage.getViewport().update(width, height, true);
+        }
     }
 
     @Override
@@ -476,9 +614,12 @@ public class GameScreen extends ScreenAdapter {
         super.dispose();
         if (sr != null) sr.dispose();
         if (batch != null) batch.dispose();
+        if (worldTexture != null) worldTexture.dispose();
         if (arenaTexture != null) arenaTexture.dispose();
         if (player1Texture != null) player1Texture.dispose();
         if (player2Texture != null) player2Texture.dispose();
         if (bulletTexture != null) bulletTexture.dispose();
+        if (menuStage != null) menuStage.dispose();
+        if (menuSkin != null) menuSkin.dispose();
     }
 }

@@ -6,6 +6,7 @@ public class Room {
     public String roomId;
     public Map<Integer, PlayerInfo> players = new LinkedHashMap<>();
     public int hostPlayerId;
+    public boolean gameStarted = false;
 
     public Room(String roomId, PlayerInfo host) {
         this.roomId = roomId;

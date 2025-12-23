@@ -23,8 +23,10 @@ public class Arena {
 
     public void renderSprite(SpriteBatch batch) {
         if (texture == null) return;
-        float diameter = radius * 2f;
-        batch.draw(texture, center.x - radius, center.y - radius, diameter, diameter);
+        float scale = 1.23f; // Thay đổi giá trị này để scale asset
+        float diameter = radius * 2f * scale;
+        float scaledRadius = radius * scale;
+        batch.draw(texture, center.x - scaledRadius, center.y - scaledRadius, diameter, diameter);
     }
 
     public void renderFilled(ShapeRenderer sr) {

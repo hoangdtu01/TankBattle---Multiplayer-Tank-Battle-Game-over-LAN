@@ -8,6 +8,7 @@ public class Main {
         Lwjgl3ApplicationConfiguration config = new Lwjgl3ApplicationConfiguration();
         config.setTitle("Ring Duel - LibGDX");
         config.setWindowedMode(1280, 768);
+        config.setResizable(false);
         config.useVsync(true);
         new Lwjgl3Application(new RingDuelGame(), config); 
     }

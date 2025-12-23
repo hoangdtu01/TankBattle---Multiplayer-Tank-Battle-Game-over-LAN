@@ -1,9 +1,2 @@
-com\game\Arena.class
-com\game\Player.class
-com\game\Entity.class
-com\game\InputController.class
-com\game\KnockbackSystem.class
-com\game\Main.class
-com\game\RingDuelGame.class
-com\game\Bullet.class
-com\game\GameScreen.class
+com\game\net\client\NetClient$1.class
+com\game\net\server\SignalingServer$1.class

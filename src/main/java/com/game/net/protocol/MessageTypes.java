@@ -16,5 +16,7 @@ public enum MessageTypes {
     INPUT,
     SNAPSHOT,
     START_GAME,
-    REQUEST_ROOM_STATE
+    REQUEST_ROOM_STATE,
+    LEAVE_ROOM,
+    ROOM_CLOSED
 }

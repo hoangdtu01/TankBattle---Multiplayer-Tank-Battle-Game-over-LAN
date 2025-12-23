@@ -28,7 +28,7 @@ public class SignalingServer {
     }
 
     private void handleClient(Socket socket) {
-        
+        PlayerInfo player = null;
         try {
             ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
             ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
@@ -43,7 +43,7 @@ public class SignalingServer {
                     : hello.playerName;
 
             int playerId = nextPlayerId++;
-            PlayerInfo player = new PlayerInfo(playerId, name, socket, out);
+            player = new PlayerInfo(playerId, name, socket, out);
 
             System.out.println(name + " connected (" + socket.getInetAddress() + ")");
             // Gửi lại WELCOME với playerId
@@ -60,7 +60,56 @@ public class SignalingServer {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            // Player disconnected
+            if (player != null) {
+                handlePlayerDisconnect(player);
+            }
+        }
+    }
+    
+    private void handlePlayerDisconnect(PlayerInfo player) {
+        System.out.println(player.name + " disconnected");
+        
+        // Tìm room chứa player này
+        Room roomToRemove = null;
+        for (Room room : rooms.values()) {
+            if (room.players.containsKey(player.playerId)) {
+                // Nếu là host, xóa room và đẩy tất cả players ra
+                if (room.hostPlayerId == player.playerId) {
+                    roomToRemove = room;
+                    break;
+                } else {
+                    // Nếu không phải host, chỉ remove player này
+                    room.players.remove(player.playerId);
+                    try {
+                        broadcastRoomUpdate(room);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        
+        // Xóa room nếu host disconnect
+        if (roomToRemove != null) {
+            rooms.remove(roomToRemove.roomId);
+            System.out.println("Room " + roomToRemove.roomId + " closed (host disconnected)");
+            
+            // Gửi ROOM_CLOSED cho tất cả players còn lại
+            Messages.RoomClosed rc = new Messages.RoomClosed();
+            rc.type = MessageTypes.ROOM_CLOSED;
+            rc.roomId = roomToRemove.roomId;
+            
+            for (PlayerInfo p : roomToRemove.players.values()) {
+                if (p.playerId != player.playerId) {
+                    try {
+                        p.out.writeObject(rc);
+                        p.out.flush();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
     }
 
@@ -117,7 +166,17 @@ public class SignalingServer {
             case REQUEST_ROOM_LIST -> {
                 RoomList rl = new RoomList();
                 rl.type = MessageTypes.ROOM_LIST;
-                rl.roomIds = new ArrayList<>(rooms.keySet());
+                rl.roomIds = new ArrayList<>();
+                
+                // Chỉ hiển thị các room chưa bắt đầu
+                for (Room room : rooms.values()) {
+                    if (!room.gameStarted) {
+                        rl.roomIds.add(room.roomId);
+                    }
+                }
+                // for (Room room : rooms.values()) {
+                //     rl.roomIds.add(room.roomId);
+                // }
 
                 player.out.writeObject(rl);
                 player.out.flush();
@@ -133,6 +192,34 @@ public class SignalingServer {
 
                 if (room.allReady() && room.players.size() >= 2) {
                     startGame(room);
+                }
+            }
+            
+            case LEAVE_ROOM -> {
+                Messages.LeaveRoom lr = (Messages.LeaveRoom) msg;
+                Room room = rooms.get(lr.roomId);
+                if (room == null) return;
+                
+                // Nếu là host, xóa room và đẩy tất cả players ra
+                if (room.hostPlayerId == player.playerId) {
+                    rooms.remove(room.roomId);
+                    System.out.println("Room " + room.roomId + " closed (host left)");
+                    
+                    // Gửi ROOM_CLOSED cho tất cả players còn lại
+                    Messages.RoomClosed rc = new Messages.RoomClosed();
+                    rc.type = MessageTypes.ROOM_CLOSED;
+                    rc.roomId = room.roomId;
+                    
+                    for (PlayerInfo p : room.players.values()) {
+                        if (p.playerId != player.playerId) {
+                            p.out.writeObject(rc);
+                            p.out.flush();
+                        }
+                    }
+                } else {
+                    // Nếu không phải host, chỉ remove player này
+                    room.players.remove(player.playerId);
+                    broadcastRoomUpdate(room);
                 }
             }
         }
@@ -160,6 +247,7 @@ public class SignalingServer {
 
     private void startGame(Room room) throws IOException {
         System.out.println("Start game in room " + room.roomId);
+        room.gameStarted = true;
 
         PeerList pl = new PeerList();
         pl.type = MessageTypes.PEER_LIST;

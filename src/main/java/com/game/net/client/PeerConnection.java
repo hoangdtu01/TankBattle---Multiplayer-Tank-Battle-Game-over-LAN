@@ -18,12 +18,15 @@ public class PeerConnection {
     
     public PeerConnection() throws Exception {
         socket = new DatagramSocket(); // tự chọn port LAN
-        socket.setSoTimeout(5000);
+        // Don't set timeout globally - only use it for handshake
     }
 
     // ===== HANDSHAKE VỚI HOST =====
     public void connectToHost(String hostIp, int hostPort, int playerId) throws Exception {
         hostAddr = new InetSocketAddress(hostIp, hostPort);
+        
+        // Set timeout for handshake only
+        socket.setSoTimeout(5000);
 
         UdpHello hello = new UdpHello();
         hello.playerId = playerId;
@@ -53,6 +56,9 @@ public class PeerConnection {
         if (!connected) {
             throw new RuntimeException("UDP handshake failed");
         }
+        
+        // Remove timeout after handshake so listening thread can block indefinitely
+        socket.setSoTimeout(0);
     }
 
     public DatagramSocket getSocket() {

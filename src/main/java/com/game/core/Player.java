@@ -15,7 +15,7 @@ public class Player extends Entity {
     public int id;
     public float facing = 0f;
     public float radius = 18f;
-    public float spriteScale = 1.6f;
+    public float spriteScale = 3f;
     public Color color = Color.CYAN;
 
     public float maxSpeed = 220f;
