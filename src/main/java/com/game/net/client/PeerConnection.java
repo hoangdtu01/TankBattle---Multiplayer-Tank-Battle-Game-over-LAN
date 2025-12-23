@@ -87,10 +87,15 @@ public class PeerConnection {
                 byte[] buf = new byte[2048];
                 while (true) {
                     DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                    socket.receive(packet);
-                    Object obj = deserialize(packet.getData());
-                    if (obj instanceof SnapshotMsg snap) {
-                        handler.onSnapshot(snap);
+                    try {
+                        socket.receive(packet);
+                        Object obj = deserialize(packet.getData());
+                        if (obj instanceof SnapshotMsg snap) {
+                            handler.onSnapshot(snap);
+                        }
+                    } catch (SocketException se) {
+                        if (socket.isClosed()) break;
+                        throw se;
                     }
                 }
             } catch (Exception e) {
@@ -112,6 +117,17 @@ public class PeerConnection {
                 new ByteArrayInputStream(data)
         );
         return ois.readObject();
+    }
+
+    // Close socket and cleanup
+    public void close() {
+        try {
+            if (socket != null && !socket.isClosed()) socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            hostAddr = null;
+        }
     }
 
     public interface SnapshotHandler {

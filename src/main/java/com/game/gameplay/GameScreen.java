@@ -136,6 +136,28 @@ public class GameScreen extends ScreenAdapter {
             WORLD_H
         );
     }
+
+    // Cleanup any network resources when leaving the game screen
+    private void cleanupNetwork() {
+        try {
+            if (hostUdp != null) {
+                try { hostUdp.close(); } catch (Exception e) { e.printStackTrace(); }
+                hostUdp = null;
+            }
+
+            if (peer != null) {
+                try { peer.close(); } catch (Exception e) { e.printStackTrace(); }
+                peer = null;
+            }
+
+            isMultiplayer = false;
+            isHost = false;
+            lastSnapshot = null;
+            pendingInputs.clear();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     // Hoang contructor multiplayer
     // ===== MULTIPLAYER CONSTRUCTOR =====
     public GameScreen(RingDuelGame game, GameConfigMsg gc) {
@@ -288,6 +310,9 @@ public class GameScreen extends ScreenAdapter {
                             e.printStackTrace();
                         }
                     }
+                    // Cleanup network resources (sockets/threads)
+                    cleanupNetwork();
+
                     game.setScreen(new MainMenuScreen(game));
                 }
             }
@@ -592,7 +617,11 @@ public class GameScreen extends ScreenAdapter {
                     });
                 }
 
-                hostUdp.broadcastSnapshot(snap);
+                if (hostUdp != null) {
+                    hostUdp.broadcastSnapshot(snap);
+                } else {
+                    Gdx.app.log("GAME", "hostUdp is null — cannot broadcast snapshot");
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

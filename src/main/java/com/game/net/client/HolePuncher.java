@@ -27,20 +27,26 @@ public class HolePuncher {
                 byte[] buf = new byte[1024];
                 while (true) {
                     DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                    socket.receive(packet);
+                    try {
+                        socket.receive(packet);
 
-                    Object obj = deserialize(packet.getData());
-                    if (obj instanceof UdpHello hello) {
-                        InetSocketAddress addr =
-                                new InetSocketAddress(packet.getAddress(), hello.udpPort);
-                        clients.put(hello.playerId, addr);
+                        Object obj = deserialize(packet.getData());
+                        if (obj instanceof UdpHello hello) {
+                            InetSocketAddress addr =
+                                    new InetSocketAddress(packet.getAddress(), hello.udpPort);
+                            clients.put(hello.playerId, addr);
 
-                        System.out.println("[UDP] HELLO from player " + hello.playerId);
+                            System.out.println("[UDP] HELLO from player " + hello.playerId);
 
-                        // gửi ACK lại cho client
-                        UdpAck ack = new UdpAck();
-                        ack.hostPlayerId = hello.playerId;
-                        send(addr, ack);
+                            // gửi ACK lại cho client
+                            UdpAck ack = new UdpAck();
+                            ack.hostPlayerId = hello.playerId;
+                            send(addr, ack);
+                        }
+                    } catch (SocketException se) {
+                        // socket closed -> stop thread
+                        if (socket.isClosed()) break;
+                        throw se;
                     }
                 }
             } catch (Exception e) {
@@ -75,11 +81,16 @@ public class HolePuncher {
                 byte[] buf = new byte[2048];
                 while (true) {
                     DatagramPacket packet = new DatagramPacket(buf, buf.length);
-                    socket.receive(packet);
+                    try {
+                        socket.receive(packet);
 
-                    Object obj = deserialize(packet.getData());
-                    if (obj instanceof InputMsg input) {
-                        handler.onInput(input);
+                        Object obj = deserialize(packet.getData());
+                        if (obj instanceof InputMsg input) {
+                            handler.onInput(input);
+                        }
+                    } catch (SocketException se) {
+                        if (socket.isClosed()) break;
+                        throw se;
                     }
                 }
             } catch (Exception e) {
@@ -111,6 +122,19 @@ public class HolePuncher {
                 new ByteArrayInputStream(data)
         );
         return ois.readObject();
+    }
+
+    // Close the underlying socket and stop listener threads
+    public void close() {
+        try {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            clients.clear();
+        }
     }
 
     public interface InputHandler {
