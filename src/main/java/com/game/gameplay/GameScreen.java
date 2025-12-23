@@ -14,6 +14,7 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.scenes.scene2d.Actor;
 import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -94,6 +95,11 @@ public class GameScreen extends ScreenAdapter {
     private Skin menuSkin;
     private boolean menuOpen = false;
     private Table menuTable;
+    private Table endGameTable;
+    private Label endGameLabel;
+    private boolean matchEnded = false;
+    private float endGameTimer = 0f;
+    private final float ENDGAME_AUTO_RETURN = 3f;
 
 
     public GameScreen() {
@@ -188,6 +194,15 @@ public class GameScreen extends ScreenAdapter {
                 p.setTexture(player2Texture);
             }
             
+            // set player name from game config if available
+            if (gc.playerNames != null && gc.playerNames.containsKey(pid)) {
+                p.name = gc.playerNames.get(pid);
+            } else if (game != null && game.playerId > 0 && pid == game.playerId && game.playerName != null && !game.playerName.isEmpty()) {
+                p.name = game.playerName;
+            } else {
+                p.name = "P" + pid;
+            }
+
             players.add(p);
 
             angle += angleStep;
@@ -344,6 +359,19 @@ public class GameScreen extends ScreenAdapter {
         menuTable.add(closeBtn).width(300).height(50);
         
         menuStage.addActor(menuTable);
+
+        // End-game popup (hidden by default)
+        endGameTable = new Table();
+        endGameTable.setFillParent(true);
+        endGameTable.setVisible(false);
+        endGameTable.setBackground(menuSkin.newDrawable("white", new Color(0,0,0,0.85f)));
+
+        endGameLabel = new Label("", menuSkin);
+        endGameLabel.setFontScale(1.4f);
+        endGameLabel.getColor().a = 0.95f;
+
+        endGameTable.add(endGameLabel).padBottom(20).row();
+        menuStage.addActor(endGameTable);
     }
     
     private void toggleMenu() {
@@ -415,6 +443,26 @@ public class GameScreen extends ScreenAdapter {
     }
 
     private void fixedTick(float dt) {
+        if (matchEnded) {
+            // allow auto-return timer
+            if (endGameTimer > 0f) {
+                endGameTimer -= dt;
+                if (endGameTimer <= 0f) {
+                    // auto return now
+                    if (game != null && game.netClient != null && game.netClient.isConnected() && isHost) {
+                        try {
+                            LeaveRoom lr = new LeaveRoom();
+                            lr.type = MessageTypes.LEAVE_ROOM;
+                            lr.roomId = game.roomId;
+                            game.netClient.send(lr);
+                        } catch (Exception e) { e.printStackTrace(); }
+                    }
+
+                    cleanupNetwork();
+                    if (game != null) game.setScreen(new MainMenuScreen(game));
+                }
+            }
+        }
         Player local = getPlayerById(localPlayerId);
 
         // if (isMultiplayer && !isHost && local == null) {
@@ -478,6 +526,11 @@ public class GameScreen extends ScreenAdapter {
                     p.isShielding = s[6] == 1f;
                     p.clip = (int)s[7];
                     p.isReloading = s[8] == 1f;
+                    // lives (if present)
+                    if (s.length > 9) {
+                        p.lives = (int) s[9];
+                        p.eliminated = p.lives <= 0;
+                    }
                 }
             }
 
@@ -487,6 +540,18 @@ public class GameScreen extends ScreenAdapter {
                 Vector2 pos = new Vector2(b[0], b[1]);
                 Vector2 dir = new Vector2(b[2], b[3]);
                 bullets.add(new Bullet(pos, dir, -1));
+            }
+
+            // If host signalled match end, show popup on clients
+            if (lastSnapshot.matchEnded && !matchEnded) {
+                matchEnded = true;
+                String winnerMsg = (lastSnapshot.winnerId > 0) ? ("Player " + lastSnapshot.winnerId + " wins!") : "No winners";
+                Gdx.app.log("GAME", "Match ended (by host): " + winnerMsg);
+                if (menuStage == null) setupMenu();
+                endGameLabel.setText(winnerMsg);
+                endGameTable.setVisible(true);
+                Gdx.input.setInputProcessor(menuStage);
+                endGameTimer = ENDGAME_AUTO_RETURN;
             }
         }
 
@@ -520,14 +585,22 @@ public class GameScreen extends ScreenAdapter {
         // 3. HOST / OFFLINE: update logic
         for (Player p : players) p.update(dt);
 
-        // 4. Arena check
+        // 4. Arena check: fall out => lose 1 life, if lives==0 => eliminated
         for (Player p : players) {
             if (p.alive && arena.isOutside(p.pos)) {
-                p.alive = false;
-                p.deathTimer = 1.2f; // thời gian trước khi respawn (tùy chỉnh)
-                // reset một chút vận tốc để tránh "bay tiếp" sau respawn
+                p.lives -= 1;
+                // reset velocity
                 p.vel.setZero();
-                Gdx.app.log("GAME", "Player " + p.id + " fell out of arena at pos=" + p.pos);
+                if (p.lives <= 0) {
+                    p.alive = false;
+                    p.eliminated = true;
+                    p.deathTimer = Float.MAX_VALUE; // won't respawn
+                    Gdx.app.log("GAME", "Player " + p.id + " eliminated (no lives left)");
+                } else {
+                    p.alive = false;
+                    p.deathTimer = 1.2f; // thời gian trước khi respawn
+                    Gdx.app.log("GAME", "Player " + p.id + " fell out of arena and lost a life. Lives left=" + p.lives);
+                }
             }
         }
 
@@ -575,9 +648,38 @@ public class GameScreen extends ScreenAdapter {
         }
 
         for (Player p : players) {
-            if (!p.alive) {
+            if (!p.alive && p.lives > 0) {
                 p.deathTimer -= dt;
                 if (p.deathTimer <= 0f) p.respawn(arena);
+            }
+        }
+
+        // Check for end of game: only one player with lives > 0 remains
+        int alivePlayers = 0;
+        int lastAliveId = -1;
+        for (Player p : players) {
+            if (p.lives > 0) {
+                alivePlayers++;
+                lastAliveId = p.id;
+            }
+        }
+
+        if (alivePlayers <= 1) {
+            // Show end-game popup (first time only)
+            if (!matchEnded) {
+                matchEnded = true;
+                String winnerMsg = (alivePlayers == 1) ? ("Player " + lastAliveId + " wins!") : "No winners";
+                Gdx.app.log("GAME", "Match ended: " + winnerMsg);
+
+                // Ensure menu UI exists
+                if (menuStage == null) setupMenu();
+
+                endGameLabel.setText(winnerMsg);
+                endGameTable.setVisible(true);
+                Gdx.input.setInputProcessor(menuStage);
+
+                // auto return after delay
+                endGameTimer = ENDGAME_AUTO_RETURN;
             }
         }
 
@@ -601,11 +703,16 @@ public class GameScreen extends ScreenAdapter {
                             p.knockback,
                             p.alive ? 1f : 0f,
                             p.isShielding ? 1f : 0f,
-                            p.clip, 
-                            p.isReloading ? 1f : 0f
+                            p.clip,
+                            p.isReloading ? 1f : 0f,
+                            (float)p.lives
                         }
                     );
                 }
+
+                // include match end flag/winner so clients can show popup
+                snap.matchEnded = matchEnded;
+                snap.winnerId = (alivePlayers == 1) ? lastAliveId : -1;
 
                 snap.bullets = new ArrayList<>();
                 for (Bullet b : bullets) {
@@ -641,6 +748,8 @@ public class GameScreen extends ScreenAdapter {
     @Override
     public void dispose() {
         super.dispose();
+        // ensure network sockets are closed when disposing the screen
+        cleanupNetwork();
         if (sr != null) sr.dispose();
         if (batch != null) batch.dispose();
         if (worldTexture != null) worldTexture.dispose();

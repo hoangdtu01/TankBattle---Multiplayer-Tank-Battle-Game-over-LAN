@@ -134,12 +134,18 @@ public class HUDRenderer {
             case 3: x = worldWidth - padding - 160; y = padding + 120; break;
         }
 
+        // Draw player name
         font.setColor(Color.WHITE);
         font.getData().setScale(1.2f);
+        font.draw(batch, p.name, x, y + 18);
 
-        font.draw(batch, 
-            "KB: " + (int)p.knockback + "%", 
-            x, y
-        );
+        // Draw KB and lives
+        font.setColor(Color.WHITE);
+        font.getData().setScale(1.0f);
+        font.draw(batch, "KB: " + (int)p.knockback + "%", x, y);
+
+        font.setColor(Color.RED);
+        font.getData().setScale(1.0f);
+        font.draw(batch, "Lives: " + p.lives, x + 100, y);
     }
 }

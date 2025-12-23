@@ -149,6 +149,8 @@ public class LobbyScreen implements Screen {
             JoinRoom jr = new JoinRoom();
             jr.type = MessageTypes.JOIN_ROOM;
             jr.roomId = roomId;
+            String name = game.playerName;
+            if (name != null && !name.isEmpty()) jr.playerName = name;
 
             game.netClient.send(jr);
             game.roomId = roomId;

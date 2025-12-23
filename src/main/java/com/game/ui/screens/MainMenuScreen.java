@@ -99,6 +99,9 @@ public class MainMenuScreen implements Screen {
                     CreateRoom cr = new CreateRoom();
                     cr.type = MessageTypes.CREATE_ROOM;
                     cr.roomId = roomId;
+                    // include current name so server updates its record
+                    String name = nameField.getText().trim();
+                    cr.playerName = name.isEmpty() ? null : name;
 
                     game.netClient.send(cr);
                     game.roomId = roomId;
@@ -182,11 +185,13 @@ public class MainMenuScreen implements Screen {
     }
     
     private void ensureConnected(TextField nameField) throws IOException {
-        if (!game.netClient.isConnected()) {
-            String name = nameField.getText().trim();
-            if (name.isEmpty()) name = null;
+        // Always update the local player's name from the input field
+        String name = nameField.getText().trim();
+        if (name.isEmpty()) name = null;
+        game.playerName = name;
 
-            game.playerName = name;
+        // Connect if not already connected
+        if (!game.netClient.isConnected()) {
             game.netClient.connect("localhost", 9999, name);
         }
     }

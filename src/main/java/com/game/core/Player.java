@@ -13,6 +13,7 @@ import java.util.List;
 public class Player extends Entity {
 
     public int id;
+    public String name;
     public float facing = 0f;
     public float radius = 18f;
     public float spriteScale = 3f;
@@ -40,6 +41,10 @@ public class Player extends Entity {
 
     public boolean alive = true;
     public float deathTimer = 0f;
+    // number of lives (mạng)
+    public int lives = 3;
+    // eliminated when lives <= 0
+    public boolean eliminated = false;
 
     public boolean isDashing = false;
     public float dashSpeed = 520f;
@@ -64,6 +69,7 @@ public class Player extends Entity {
     public Player(int id, Vector2 spawn) {
         this.id = id;
         this.pos = spawn.cpy();
+        this.name = "P" + id;
         if (id == 1) color = Color.CYAN;
         else color = Color.ORANGE;
     }
@@ -281,8 +287,8 @@ public class Player extends Entity {
     }
 
     public String toDebugString() {
-        return String.format("P%d pos(%.1f,%.1f) KB=%.1f shield=%.1f clip=%d",
-                id,pos.x,pos.y,knockback,shieldDurability,clip);
+        return String.format("P%d pos(%.1f,%.1f) KB=%.1f shield=%.1f clip=%d lives=%d elim=%s",
+            id,pos.x,pos.y,knockback,shieldDurability,clip, lives, eliminated ? "Y" : "N");
     }
 
     public void respawn(Arena arena) {

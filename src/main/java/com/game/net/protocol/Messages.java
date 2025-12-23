@@ -21,6 +21,7 @@ public class Messages {
 
     public static class JoinRoom extends BaseMessage {
         public String roomId;
+        public String playerName; // optional, to update server-side name
     }
 
     public static class Ready extends BaseMessage {
@@ -30,6 +31,7 @@ public class Messages {
 
     public static class CreateRoom extends BaseMessage {
         public String roomId;
+        public String playerName; // optional, to update server-side name
     }
 
     public static class RequestRoomList extends BaseMessage {
@@ -60,10 +62,12 @@ public class Messages {
         public int hostPlayerId;
         public long startTime;
         public List<Integer> playerIds;
+        public java.util.Map<Integer, String> playerNames; // id -> name
     }
 
     public static class RequestRoomState extends BaseMessage {
         public String roomId;
+        public String playerName; // optional, to update server-side name
     }
     
     public static class LeaveRoom extends BaseMessage {
@@ -89,6 +93,9 @@ public class Messages {
         public int lastProcessedSeq;
         public HashMap<Integer, float[]> playerState;  // id -> {x, y, facing, shield, knockback, alive}
         public List<float[]> bullets;   // bullet: {x, y, dirX, dirY}
+        // match end flag (host sets this)
+        public boolean matchEnded = false;
+        public int winnerId = -1;
     }
 
     // ===== UDP HANDSHAKE =====

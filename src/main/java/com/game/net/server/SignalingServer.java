@@ -122,6 +122,12 @@ public class SignalingServer {
 
                 if (rooms.containsKey(cr.roomId)) return;
 
+                // update player's name if provided and reset ready flag
+                if (cr.playerName != null && !cr.playerName.isEmpty()) {
+                    player.name = cr.playerName;
+                }
+                player.ready = false;
+
                 Room room = new Room(cr.roomId, player);
                 rooms.put(cr.roomId, room);
 
@@ -156,6 +162,11 @@ public class SignalingServer {
 
                 if (room.players.size() >= 4) return;
 
+                // update player's name if provided, reset ready flag, then add
+                if (jr.playerName != null && !jr.playerName.isEmpty()) {
+                    player.name = jr.playerName;
+                }
+                player.ready = false;
                 room.players.put(player.playerId, player);
 
                 System.out.println(
@@ -265,6 +276,10 @@ public class SignalingServer {
         gc.hostPlayerId = room.hostPlayerId;
         gc.startTime = System.currentTimeMillis() + 3000;
         gc.playerIds = new ArrayList<>(room.players.keySet());
+        gc.playerNames = new HashMap<>();
+        for (PlayerInfo p : room.players.values()) {
+            gc.playerNames.put(p.playerId, p.name);
+        }
 
         broadcast(room, pl);
         broadcast(room, gc);
