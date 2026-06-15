@@ -1,4 +1,4 @@
-# Ring Duel
+# Tank BATTLEGROUND
 
 > LAN Multiplayer Tank Battle Game developed using **Java** and **LibGDX**.
 
