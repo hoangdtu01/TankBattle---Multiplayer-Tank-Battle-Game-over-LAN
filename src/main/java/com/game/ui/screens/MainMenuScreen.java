@@ -90,7 +90,7 @@ public class MainMenuScreen implements Screen {
             public void changed(ChangeEvent event, Actor actor) {
                 try {
                     // Tự động start server nếu chưa chạy
-                    startSignalingServer();
+                    // startSignalingServer();
                     
                     ensureConnected(nameField); 
 
@@ -156,18 +156,18 @@ public class MainMenuScreen implements Screen {
         if (serverInstance == null || serverThread == null || !serverThread.isAlive()) {
             try {
                 // Kiểm tra port có đang được sử dụng không
-                try (ServerSocket testSocket = new ServerSocket(9999)) {
+                try (ServerSocket testSocket = new ServerSocket(1099)) {
                     testSocket.close();
                 } catch (Exception e) {
                     // Port đã được sử dụng, server có thể đã chạy
-                    System.out.println("Server may already be running on port 9999");
+                    System.out.println("Server may already be running on port 1099");
                     return;
                 }
                 
                 serverInstance = new SignalingServer();
                 serverThread = new Thread(() -> {
                     try {
-                        serverInstance.start(9999);
+                        serverInstance.start(1099);
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -192,7 +192,8 @@ public class MainMenuScreen implements Screen {
 
         // Connect if not already connected
         if (!game.netClient.isConnected()) {
-            game.netClient.connect("localhost", 9999, name);
+            // game.netClient.connect("localhost", 9999, name);
+            game.netClient.connect("192.168.56.1", 1099, name);
         }
     }
 

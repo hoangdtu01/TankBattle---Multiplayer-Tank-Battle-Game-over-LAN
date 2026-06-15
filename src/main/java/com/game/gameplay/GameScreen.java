@@ -244,7 +244,7 @@ public class GameScreen extends ScreenAdapter {
                 // CLIENT
                 peer = new PeerConnection();
                 // lấy IP host từ PeerList (tạm hardcode LAN)
-                peer.connectToHost("127.0.0.1", 7777, game.playerId);
+                peer.connectToHost("192.168.56.1", 7777, game.playerId);
 
                 // nhận SNAPSHOT
                 peer.listenSnapshot(snap -> {

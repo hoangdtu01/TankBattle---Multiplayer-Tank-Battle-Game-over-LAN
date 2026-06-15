@@ -291,8 +291,8 @@ public class SignalingServer {
             p.out.flush();
         }
     }
-
+    
     public static void main(String[] args) throws Exception {
-        new SignalingServer().start(9999);
+        new SignalingServer().start(1099);
     }
 }
